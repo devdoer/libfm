@@ -27,7 +27,7 @@ class fm_learn_sgd_element: public fm_learn_sgd {
 		}
 		virtual void learn(Data& train, Data& test) {
 			//SGD training
-			fm_learn_sgd::learn(train, test);//call parent
+			fm_learn_sgd::learn(train, test);//call parent, do nothing, cout
 
 			std::cout << "SGD: DON'T FORGET TO SHUFFLE THE ROWS IN TRAINING DATA TO GET THE BEST RESULTS." << std::endl; 
 			// SGD
@@ -36,14 +36,16 @@ class fm_learn_sgd_element: public fm_learn_sgd {
 				double iteration_time = getusertime();
 				for (train.data->begin(); !train.data->end(); train.data->next()) {
 					
+					//getRow() return sparse_row<T> of sparse_entry of (id, value)
 					double p = fm->predict(train.data->getRow(), sum, sum_sqr);//fm_model* fm defined in fm_model.h
 					double mult = 0;
+					DATA_FLOAT target = train.data->getRowTarget();
 					if (task == 0) {//regression
 						p = std::min(max_target, p);
 						p = std::max(min_target, p);
-						mult = -(train.target(train.data->getRowIndex())-p);//Gradient
+						mult = p-target;//Gradient
 					} else if (task == 1) {//classification
-						mult = -train.target(train.data->getRowIndex())*(1.0-1.0/(1.0+exp(-train.target(train.data->getRowIndex())*p)));//Gradient
+						mult = target*(1.0/(1.0+exp(-target*p)) - 1.0);//Gradient 
 					}				
 					SGD(train.data->getRow(), mult, sum);					
 				}				

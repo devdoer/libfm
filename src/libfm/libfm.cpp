@@ -71,6 +71,7 @@ int main(int argc, char **argv) {
 
 		const std::string param_cache_size = cmdline.registerParameter("cache_size", "cache size for data storage (only applicable if data is in binary format), default=infty");
 
+		const std::string param_vw_format = cmdline.registerParameter("vw_format", "vw format support");
 
 		const std::string param_do_sampling	= "do_sampling";
 		const std::string param_do_multilevel	= "do_multilevel";
@@ -86,7 +87,8 @@ int main(int argc, char **argv) {
 		if (! cmdline.hasParameter(param_init_stdev)) { cmdline.setValue(param_init_stdev, "0.1"); }
 		if (! cmdline.hasParameter(param_dim)) { cmdline.setValue(param_dim, "1,1,8"); }
 		if (! cmdline.hasParameter(param_learn_rate)) { cmdline.setValue(param_learn_rate, "0.1"); }
-
+		
+		
 		if (! cmdline.getValue(param_method).compare("als")) { // als is an mcmc without sampling and hyperparameter inference
 			cmdline.setValue(param_method, "mcmc");
 			if (! cmdline.hasParameter(param_do_sampling)) { cmdline.setValue(param_do_sampling, "0"); }
@@ -97,8 +99,11 @@ int main(int argc, char **argv) {
 		std::cout << "Loading train...\t" << std::endl;
 		Data train(
 			cmdline.getValue(param_cache_size, 0),
-			! (!cmdline.getValue(param_method).compare("mcmc")), // no original data for mcmc
-			! (!cmdline.getValue(param_method).compare("sgd") || !cmdline.getValue(param_method).compare("sgda")) // no transpose data for sgd, sgda
+				// no original data for mcmc
+			! (!cmdline.getValue(param_method).compare("mcmc")), 
+				// no transpose data for sgd, sgda
+			! (!cmdline.getValue(param_method).compare("sgd") || !cmdline.getValue(param_method).compare("sgda")),
+			cmdline.hasParameter(param_vw_format)	 
 		);
 		train.load(cmdline.getValue(param_train_file));
 		if (cmdline.getValue(param_verbosity, 0) > 0) { train.debug(); }
@@ -198,9 +203,10 @@ int main(int argc, char **argv) {
 		meta.num_relations = train.relation.dim;
 
 		// (2) Setup the factorization machine
+		std::cout<<"init factor model..."<<endl;
 		fm_model fm;
 		{
-			fm.num_attribute = num_all_attribute;
+			fm.num_attribute = num_all_attribute;// set number of feature weights
 			fm.init_stdev = cmdline.getValue(param_init_stdev, 0.1);
 			// set the number of dimensions in the factorization
 			{ 
@@ -213,7 +219,8 @@ int main(int argc, char **argv) {
 			fm.init();		
 			
 		}
-
+		std::cout<<"init factor model ok!"<<endl;
+		
 		// (3) Setup the learning method:
 		fm_learn* fml;
 		if (! cmdline.getValue(param_method).compare("sgd")) {
@@ -244,9 +251,9 @@ int main(int argc, char **argv) {
 		fml->min_target = train.min_target;
 		fml->meta = &meta;
 		if (! cmdline.getValue("task").compare("r") ) {
-			fml->task = 0;
+			fml->task = 0; //regression
 		} else if (! cmdline.getValue("task").compare("c") ) {
-			fml->task = 1;
+			fml->task = 1; //classification
 			for (uint i = 0; i < train.target.dim; i++) { if (train.target(i) <= 0.0) { train.target(i) = -1.0; } else {train.target(i) = 1.0; } }
 			for (uint i = 0; i < test.target.dim; i++) { if (test.target(i) <= 0.0) { test.target(i) = -1.0; } else {test.target(i) = 1.0; } }
 			if (validation != NULL) {

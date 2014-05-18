@@ -24,8 +24,8 @@ class fm_model {
 		DVector<double> m_sum, m_sum_sqr;
 	public:
 		double w0;
-		DVectorDouble w;
-		DMatrixDouble v;
+		DVectorDouble w; // num_features
+		DMatrixDouble v; // K*num_features
 
 	public:
 		// the following values should be set:
@@ -74,8 +74,8 @@ void fm_model::debug() {
 
 void fm_model::init() {
 	w0 = 0;
-	w.setSize(num_attribute);
-	v.setSize(num_factor, num_attribute);
+	w.setSize(num_attribute);//w1, feature numbers
+	v.setSize(num_factor, num_attribute);// v feature
 	w.init(0);
 	v.init(init_mean, init_stdev);
 	m_sum.setSize(num_factor);
