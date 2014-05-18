@@ -27,8 +27,8 @@ void fm_SGD(fm_model* fm, const double& learn_rate, sparse_row<DATA_FLOAT> &x, c
 			w -= learn_rate * (multiplier * x.data[i].value + fm->regw * w);
 		}
 	}	
-	for (int f = 0; f < fm->num_factor; f++) {
-		for (uint i = 0; i < x.size; i++) {
+	for (int f = 0; f < fm->num_factor; f++) {//for each factor
+		for (uint i = 0; i < x.size; i++) {//for each feature
 			double& v = fm->v(f,x.data[i].id);
 			double grad = sum(f) * x.data[i].value - v * x.data[i].value * x.data[i].value; 
 			v -= learn_rate * (multiplier * grad + fm->regv * v);

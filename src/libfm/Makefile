@@ -4,14 +4,15 @@ OBJECTS := \
 	libfm.o \
 	tools/transpose.o \
 	tools/convert.o \
+	tools/parse_vw.o \
 
-all: libFM transpose convert
+all: libFM transpose convert parse_vw
 
 libFM: libfm.o
 	g++ -O3 -Wall libfm.o -o $(BIN_DIR)libFM
 
 %.o: %.cpp
-	g++ -O3 -Wall -c $< -o $@
+	g++ -g -Wall -c $< -o $@
 
 clean:	clean_lib
 	rm -f $(BIN_DIR)libFM $(BIN_DIR)convert $(BIN_DIR)transpose
@@ -25,4 +26,7 @@ transpose: tools/transpose.o
 
 convert: tools/convert.o
 	g++ -O3 tools/convert.o -o $(BIN_DIR)convert
+
+parse_vw: tools/parse_vw.o
+	g++ -g tools/parse_vw.o -o $(BIN_DIR)parse_vw
 

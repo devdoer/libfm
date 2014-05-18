@@ -25,6 +25,7 @@
 
 typedef unsigned int uint;
 
+
 #ifdef _WIN32
 namespace std {
 	bool isnan(double d) { return _isnan(d); }

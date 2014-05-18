@@ -1,0 +1,2 @@
+g++ -O3 -Wall -c tools/parse_vw.cpp -o tools/parse_vw.o
+g++ -O3 tools/parse_vw.o -o ../../bin/parse_vw

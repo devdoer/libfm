@@ -15,8 +15,9 @@
 #include "../../util/fmatrix.h"
 #include "../../fm_core/fm_data.h"
 #include "../../fm_core/fm_model.h"
+#include "../../util/util.h"
 
-typedef FM_FLOAT DATA_FLOAT;
+
 
 
 
@@ -56,7 +57,7 @@ class DataMetaInfo {
 		}
 };
 
-#include "relation.h"
+// #include "relation.h"
 
 class Data {
 	protected:
@@ -74,16 +75,16 @@ class Data {
 			this->vw_format_on = vw_format_on;
 		}
 
-		LargeSparseMatrix<DATA_FLOAT>* data_t;
-		LargeSparseMatrix<DATA_FLOAT>* data;// LargeSparseMatrixMemory or LargeSparseMatrixHD
-		DVector<DATA_FLOAT> target;//target and features are sperated.
+		LargeSparseMatrix<FM_FLOAT>* data_t;
+		LargeSparseMatrix<FM_FLOAT>* data;// LargeSparseMatrixMemory or LargeSparseMatrixHD
+		DVector<FM_FLOAT> target;//target and features are sperated.
 
 		int num_feature;
 		uint num_cases;
  
-		DATA_FLOAT min_target;
-		DATA_FLOAT max_target;
-		DVector<RelationJoin> relation;
+		FM_FLOAT min_target;
+		FM_FLOAT max_target;
+		// DVector<RelationJoin> relation;
 		
 		void load(std::string filename);	
 		void debug();
@@ -98,7 +99,7 @@ void Data::load(std::string filename) {
  	assert(has_x || has_xt);
 
 	if(vw_format_on){
-		this->data = new LargeSparseMatrixHD<DATA_FLOAT>(filename, cache_size);
+		this->data = new LargeSparseMatrixHD<FM_FLOAT>(filename, cache_size);
 		return;
 	}
 	int load_from = 0;
@@ -122,9 +123,9 @@ void Data::load(std::string filename) {
 		if (has_x) {
 			std::cout << "data... ";
 			if (load_from == 1) {
-				this->data = new LargeSparseMatrixHD<DATA_FLOAT>(filename + ".data", this_cs);
+				this->data = new LargeSparseMatrixHD<FM_FLOAT>(filename + ".data", this_cs);
 			} else {//load_from == 2, binary predictor data
-				this->data = new LargeSparseMatrixHD<DATA_FLOAT>(filename + ".x", this_cs);
+				this->data = new LargeSparseMatrixHD<FM_FLOAT>(filename + ".x", this_cs);
 			}
 			assert(this->target.dim == this->data->getNumRows());
 			this->num_feature = this->data->getNumCols();	
@@ -136,8 +137,8 @@ void Data::load(std::string filename) {
 		data_t = NULL;
 		
 		
-		min_target = +std::numeric_limits<DATA_FLOAT>::max();
-		max_target = -std::numeric_limits<DATA_FLOAT>::max();
+		min_target = +std::numeric_limits<FM_FLOAT>::max();
+		max_target = -std::numeric_limits<FM_FLOAT>::max();
 		for (uint i = 0; i < this->target.dim; i++) {
 			min_target = std::min(this->target(i), min_target);
 			max_target = std::max(this->target(i), max_target);				
@@ -148,16 +149,16 @@ void Data::load(std::string filename) {
 		return;
 	}//end load_from>0
 
-	this->data = new LargeSparseMatrixMemory<DATA_FLOAT>();
+	this->data = new LargeSparseMatrixMemory<FM_FLOAT>();
 	
-	DVector< sparse_row<DATA_FLOAT> >& data = ((LargeSparseMatrixMemory<DATA_FLOAT>*)this->data)->data;
+	DVector< sparse_row<FM_FLOAT> >& data = ((LargeSparseMatrixMemory<FM_FLOAT>*)this->data)->data;
 
 	int num_rows = 0;
 	uint64 num_values = 0;
 	num_feature = 0;
 	bool has_feature = false;
-	min_target = +std::numeric_limits<DATA_FLOAT>::max();
-	max_target = -std::numeric_limits<DATA_FLOAT>::max();
+	min_target = +std::numeric_limits<FM_FLOAT>::max();
+	max_target = -std::numeric_limits<FM_FLOAT>::max();
 	
 	// (1) determine the number of rows and the maximum feature_id, ie. num_rows, num_feature by max feature id
 	//     num_values: the number of values， ie. sparse matrix elem numbers
@@ -166,7 +167,7 @@ void Data::load(std::string filename) {
 		if (! fData.is_open()) {
 			throw "unable to open " + filename;
 		}
-		DATA_FLOAT _value;
+		FM_FLOAT _value;
 		int nchar, _feature;
 		while (!fData.eof()) {
 			std::string line;
@@ -200,15 +201,15 @@ void Data::load(std::string filename) {
 		num_feature++; // number of feature is bigger (by one) than the largest value
 	}
 	std::cout << "num_rows=" << num_rows << "\tnum_values=" << num_values << "\tnum_features=" << num_feature << "\tmin_target=" << min_target << "\tmax_target=" << max_target << std::endl;
-	data.setSize(num_rows);//data is of type DVector< sparse_row<DATA_FLOAT> >
+	data.setSize(num_rows);//data is of type DVector< sparse_row<FM_FLOAT> >
 	target.setSize(num_rows);
 	
-	((LargeSparseMatrixMemory<DATA_FLOAT>*)this->data)->num_cols = num_feature;
-	((LargeSparseMatrixMemory<DATA_FLOAT>*)this->data)->num_values = num_values;
+	((LargeSparseMatrixMemory<FM_FLOAT>*)this->data)->num_cols = num_feature;
+	((LargeSparseMatrixMemory<FM_FLOAT>*)this->data)->num_values = num_values;
 
-	MemoryLog::getInstance().logNew("data_float", sizeof(sparse_entry<DATA_FLOAT>), num_values);			
+	MemoryLog::getInstance().logNew("FM_FLOAT", sizeof(sparse_entry<FM_FLOAT>), num_values);			
 	// cache  store all values
-	sparse_entry<DATA_FLOAT>* cache = new sparse_entry<DATA_FLOAT>[num_values]; 
+	sparse_entry<FM_FLOAT>* cache = new sparse_entry<FM_FLOAT>[num_values]; 
 	
 	// (2) read the data
 	{
@@ -218,7 +219,7 @@ void Data::load(std::string filename) {
 		}
 		int row_id = 0;
 		uint64 cache_id = 0;
-		DATA_FLOAT _value;
+		FM_FLOAT _value;
 		int nchar, _feature;
 		while (!fData.eof()) {
 			std::string line;

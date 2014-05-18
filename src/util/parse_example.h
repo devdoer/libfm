@@ -13,15 +13,14 @@ license as described in the file LICENSE.
 #include <ctype.h>
 #include "hash.h"
 #include "cache.h"
-#include "unique_sort.h"
+// #include "unique_sort.h"
 #include "v_array.h"
+#include "vw_example.h"
+#include "parse_prim.h"
 
 using namespace std;
 
-struct substring {
-  char *begin;
-  char *end;
-};
+
 
 size_t hashstring (substring s, uint32_t h)
 {//h is a hash base
@@ -31,7 +30,7 @@ size_t hashstring (substring s, uint32_t h)
   //trim trailing white space but not UTF-8
   for(; s.end > s.begin && *(s.end-1) <= 0x20 && (int)*(s.end-1) >=0; s.end--);
 
-  char *p = s.begin;
+  const char *p = s.begin;
   while (p != s.end)
     if (*p >= '0' && *p <= '9')
       ret = 10*ret + *(p++) - '0';
@@ -59,57 +58,19 @@ hash_func_t getHasher(const string& s){
   }
 }
 
-void tokenize(char delim, substring s, v_array<substring>& ret)
-{
-  ret.erase();
-  char *last = s.begin;
-  for (; s.begin != s.end; s.begin++) {
-    if (*s.begin == delim) {
-      if (s.begin != last)
-	{
-	  substring temp = {last, s.begin};
-	  ret.push_back(temp);
-	}
-      last = s.begin+1;
-    }
-  }
-  if (s.begin != last)
-    {
-      substring final = {last, s.begin};
-      ret.push_back(final);
-    }
-}
 
-inline char* safe_index(char *start, char v, char *max)
-{
-  while (start != max && *start != v)
-    start++;
-  return start;
-}
-
-inline float float_of_substring(substring s)
-{
-  char* endptr = s.end;
-  float f = parseFloat(s.begin,&endptr);
-  if ((endptr == s.begin && s.begin != s.end) || nanpattern(f))
-    {
-      std::cout << "warning: " << std::string(s.begin, s.end-s.begin).c_str() << " is not a good float, replacing with 0" << std::endl;
-      f = 0;
-    }
-  return f;
-}
 
 class TC_parser {
   
 public:
-  char* beginLine;
-  char* reading_head;
-  char* endLine;
+  const char* beginLine;
+  const char* reading_head;
+  const char* endLine;
   float cur_channel_v;
   bool  new_index;
   size_t anon; 
   size_t channel_hash;
-  char* base;
+  const char* base;
   unsigned char index;
   float v;
   VWExample * ae;
@@ -125,7 +86,7 @@ public:
     else if(*reading_head == ':'){
       // featureValue --> ':' 'Float'
       ++reading_head;
-      char *end_read = NULL;
+      const char *end_read = NULL;
       v = parseFloat(reading_head,&end_read);
       if(end_read == reading_head){
 	cout << "malformed example !\nFloat expected after : \"" << std::string(beginLine, reading_head - beginLine).c_str()<< "\"" << endl;
@@ -166,8 +127,9 @@ public:
       else
 	word_hash = channel_hash + anon++;//add based namespace hash
       if(v == 0) return; //dont add 0 valued features to list of features
-      feature f = {v,(uint32_t)word_hash * weights_per_problem};
-      ae->sum_feat_sq[index] += v*v;//for this namespace
+      // feature f = {v,(uint32_t)word_hash * weights_per_problem};
+      Feature f = {(uint32_t)word_hash * weights_per_problem,v};
+      // ae->sum_feat_sq[index] += v*v;//for this namespace
       ae->atomics[index].push_back(f);
 	 }
 }
@@ -178,7 +140,7 @@ public:
       }else if(*reading_head == ':'){
           // nameSpaceInfoValue --> ':' 'Float'
           ++reading_head;
-          char *end_read = NULL;
+          const char *end_read = NULL;
           cur_channel_v = parseFloat(reading_head,&end_read);
           if(end_read == reading_head){
               cout << "malformed example !\nFloat expected after : \"" << std::string(beginLine, reading_head - beginLine).c_str()<< "\"" << endl;
@@ -196,14 +158,14 @@ public:
 
   inline void nameSpaceInfo(){
       //read feature namespace
-
       if(reading_head == endLine ||*reading_head == '|' || *reading_head == ' ' || *reading_head == '\t' || *reading_head == ':' || *reading_head == '\r'){
           // syntax error
           cout << "malformed example !\nString expected after : " << std::string(beginLine, reading_head - beginLine).c_str()<< "\"" << endl;
       }else{
           // NameSpaceInfo --> 'String' NameSpaceInfoValue
           index = (unsigned char)(*reading_head); //index is namespace
-          if(ae->atomics[index].begin == ae->atomics[index].end)
+          // if(ae->atomics[index].begin == ae->atomics[index].end)
+          if(ae->atomics[index].size()==0)
               new_index = true;
           substring name = read_name();
 
@@ -238,7 +200,8 @@ public:
       if(*reading_head == ' ' || *reading_head == '\t' || reading_head == endLine || *reading_head == '|' || *reading_head == '\r' ){//no namespace
           // NameSpace --> ListFeatures
           index = (unsigned char)' ';
-          if(ae->atomics[index].begin == ae->atomics[index].end)
+          // if(ae->atomics[index].begin == ae->atomics[index].end)
+          if(ae->atomics[index].size() == 0)
               new_index = true;
           
           channel_hash = 0;
@@ -251,12 +214,15 @@ public:
           // syntax error
           cout << "malformed example !\n'|' , String, space or EOL expected after : \"" << std::string(beginLine, reading_head - beginLine).c_str()<< "\"" << endl;
       }
-      if(new_index && ae->atomics[index].begin != ae->atomics[index].end)
+      // if(new_index && ae->atomics[index].begin != ae->atomics[index].end)
+      if(new_index && ae->atomics[index].size() != 0)
           //save namespace into index
+		  cout<<"new namespace "<<index<<endl;
           ae->indices.push_back(index);
   }
 
   inline void listNameSpace(){
+	  
       while(*reading_head == '|'){
           // ListNameSpace --> '|' NameSpace ListNameSpace
           ++reading_head;
@@ -269,7 +235,7 @@ public:
       }
   }
 
-  TC_parser(char* reading_head, char* endLine,  VWExample * ae){
+  TC_parser(const char* reading_head, const char* endLine,  VWExample * ae){
       this->beginLine = reading_head;
       this->reading_head = reading_head;
       this->endLine = endLine;
@@ -312,7 +278,7 @@ public:
 	    cerr << "malformed example!\n";
 	    cerr << "words.size() = " << words.size() << endl;
 	  }
-	  if (words.size() > 0  fabs(ld->label) != 1.f)
+	  if (words.size() > 0  && fabs(ex->label) != 1.f)
 	    cout << "You are using a label not -1 or 1 with a loss function expecting that!" << endl;
 	}
 	
@@ -320,8 +286,8 @@ public:
 	{
 	    //parse label header?  
 	
-	    char* bar_location = safe_index(line.begin, '|', line.end);
-	    char* tab_location = safe_index(line.begin, '\t', bar_location);
+	    const char* bar_location = safe_index(line.begin, '|', line.end);
+	    const char* tab_location = safe_index(line.begin, '\t', bar_location);
 	    substring label_space;
 	    if (tab_location != bar_location){
 	        label_space.begin = tab_location + 1;
@@ -334,7 +300,7 @@ public:
 	        this->words.erase();
 	    } else 	{
 	        tokenize(' ', label_space, this->words);
-	        if (this->words.size() > 0 && (this->words.last().end == label_space.end	|| *(all->p->words.last().begin) == '\'')) //The last field is a tag, so record and strip it off
+	        if (this->words.size() > 0 && (this->words.last().end == label_space.end|| *(this->words.last().begin) == '\'')) //The last field is a tag, so record and strip it off
 	        {
 	            substring tag = this->words.pop();
 	            //cerr<<"tag:"<<string(tag.begin,tag.end).c_str()<<endl;
@@ -354,15 +320,15 @@ public:
 
 
 
-	void read_line_cstyle(vw& all, VWExample* ex, const char* line)
+	void read_line_cstyle(  const char* line, VWExample* ex)
 	{
 	    substring ss = {line, line+strlen(line)};
-	    substring_to_example(&all, ex, ss);  
+	    this->substring_to_example( ex, ss);  
 	}
 
 	void read_line( const string & line, VWExample * ex)
 	{
-		read_line_cstyle(line.c_str());
+		this->read_line_cstyle(line.c_str(), ex);
 	}
 };
 

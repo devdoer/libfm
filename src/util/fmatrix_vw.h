@@ -3,97 +3,119 @@
 wrapper vw format file as LargeSparseMatrix
 
 */
+#ifndef FMATRIX_VW_H
+#define FMATRIX_VW_H
+
+#include "fmatrix.h"
 
 template <typename T> class LargeSparseMatrixVW : public LargeSparseMatrix<T> {
 	protected:
-		DVector< sparse_row<T> > data; //num of rows
-		DVector< sparse_entry<T> > cache; //num of values
-		std::string filename;
-		
+		DVector< sparse_row<T> > data; //vector of rows for cache
+		DVector< sparse_entry<T> > cache; //vector of values
+		std::string filename;		
 		std::ifstream in;
 
-		uint64 position_in_data_cache;
-		uint number_of_valid_rows_in_cache;
-		uint64 number_of_valid_entries_in_cache;
-		uint row_index;
 
-		uint num_cols;
+		uint max_rows_in_cache; // cache capacity
+		uint64 max_entries_in_cache;
+		
+		uint64 position_in_cache;
+		uint number_of_rows_in_cache; // cached real data
+		uint64 number_of_entries_in_cache;
+		
+		uint row_index; 
+		uint num_cols; //  size of the file
 		uint64 num_values;
 		uint num_rows;	
-
-		void parse_example(const std::string & line)
-		{
-			
-				
-				
 		
+		VWExample * ae;
+		VWExampleParser *parser;
+
+		int parse_vw_line(const std::string & line, VWExample *ae)
+		{
+				
+			return parser.read_line(line, ae);
+				
 		}
 		
 		void readcache() {
-			if (row_index >= num_rows) { return; }
-			number_of_valid_rows_in_cache = 0;
-			number_of_valid_entries_in_cache = 0;
-			position_in_data_cache = 0;
+			// if (row_index >= num_rows) { return; }
+			
+			//reset 
+			number_of_rows_in_cache = 0;
+			number_of_entries_in_cache = 0;
+			position_in_cache = 0;
 			do {
-				if ((row_index + number_of_valid_rows_in_cache) > (num_rows-1)) {
+				// if ((row_index + number_of_rows_in_cache) > (num_rows-1)) {
+				if(!std::getline(in, line)){
+					cerr<<"All rows are read."<<<endl;
+					in.close();
 					break;
 				}
-				if (number_of_valid_rows_in_cache >= data.dim) { break; }
+				
+				if(!this->parse_vw_line(line, ae))
+				{
+					cerr<<"Warning! Got an invalid vw line."<<endl;
+					continue;
+				}
+				if (number_of_rows_in_cache >= data.dim) { break; }//cache is full
 
-				sparse_row<T>& this_row = data.value[number_of_valid_rows_in_cache];
+				sparse_row<T>& this_row = data.value[number_of_rows_in_cache];//row
 				
 				in.read(reinterpret_cast<char*>(&(this_row.size)), sizeof(uint));
-				if ((this_row.size + number_of_valid_entries_in_cache) > cache.dim) {
+				if ((this_row.size + number_of_entries_in_cache) > cache.dim) {
 					in.seekg(- (long int) sizeof(uint), std::ios::cur);
 					break;
 				}
 
-				this_row.data = &(cache.value[number_of_valid_entries_in_cache]);
+				this_row.data = &(cache.value[number_of_entries_in_cache]);//mapping to cached entry
 				in.read(reinterpret_cast<char*>(this_row.data), sizeof(sparse_entry<T>)*this_row.size);
 			
-				number_of_valid_rows_in_cache++;					
-				number_of_valid_entries_in_cache += this_row.size;
+				number_of_rows_in_cache++;					
+				number_of_entries_in_cache += this_row.size;
 			} while (true);
 	
 		}	
 	public:
-		LargeSparseMatrixVW(std::string filename, uint64 cache_size) { 
+		LargeSparseMatrixVW(std::string filename,  uint max_rows_in_cache, uint number_of_enties_per_row = 256) { 
+			assert(number_of_entires_per_row > 0);
+			this->parser = new VWExampleParser();
+			if(this->parser == NULL){
+				
+				throw "new VWExampleParser failed!"
+			}
+			
 			this->filename = filename;
+			if (max_rows_in_cache == 0) {
+				this->max_rows_in_cache = std::numeric_limits<uint64>::max();
+			}
+			else
+			{
+				this->max_rows_in_cache = max_rows_in_cache;
+			}
+			
 			in.open(filename.c_str(), std::ios_base::in | std::ios_base::binary);
 			if (in.is_open()) {
-				file_header fh;
-				in.read(reinterpret_cast<char*>(&fh), sizeof(fh));
-				assert(fh.id == FMATRIX_EXPECTED_FILE_ID);
-				assert(fh.float_size == sizeof(T));
-				this->num_values = fh.num_values;
-				this->num_rows = fh.num_rows;
-				this->num_cols = fh.num_cols;				
+				
+				this->num_values = 0;
+				this->num_rows = 0;
+				this->num_cols = 0;		
+				this->number_of_rows_in_cache = 0;
+				this->number_of_entires_in_cache = 0;		
 				//in.close();
 			} else {
 				throw "could not open " + filename;
 			}
 
-			if (cache_size == 0) {
-				cache_size = std::numeric_limits<uint64>::max();
-			}
+			
 			// determine cache sizes automatically:
-			double avg_entries_per_line = (double) this->num_values / this->num_rows;
-			uint num_rows_in_cache;
-			{
-				uint64 dummy = cache_size / (sizeof(sparse_entry<T>) * avg_entries_per_line + sizeof(uint));
-				if (dummy > static_cast<uint64>(std::numeric_limits<uint>::max())) {
-					num_rows_in_cache = std::numeric_limits<uint>::max();
-				} else {
-					num_rows_in_cache = dummy;
-				}
-			}
-			num_rows_in_cache = std::min(num_rows_in_cache, this->num_rows);
-			uint64 num_entries_in_cache = (cache_size - sizeof(uint)*num_rows_in_cache) / sizeof(sparse_entry<T>);
-			num_entries_in_cache = std::min(num_entries_in_cache, this->num_values);
-			std::cout << "num entries in cache=" << num_entries_in_cache << "\tnum rows in cache=" << num_rows_in_cache << std::endl;
+			this->max_entries_in_cache = this->max_rows_in_cache * number_of_entires_per_row;
+			
+			
+			std::cout << "max entries in cache=" << max_entries_in_cache << "\tmax rows in cache=" << max_rows_in_cache << std::endl;
 
-			cache.setSize(num_entries_in_cache);
-			data.setSize(num_rows_in_cache);
+			cache.setSize(max_entries_in_cache);//num of cached entries
+			data.setSize(max_rows_in_cache);//num of cached rows
 		}
 //		~LargeSparseMatrixHD() { in.close(); }
 
@@ -103,17 +125,17 @@ template <typename T> class LargeSparseMatrixVW : public LargeSparseMatrix<T> {
 
 		virtual void next() {
 			row_index++;
-			position_in_data_cache++;
-			if (position_in_data_cache >= number_of_valid_rows_in_cache) {
+			position_in_cache++;
+			if (position_in_cache >= number_of_rows_in_cache) {
 				readcache();
 			}
 		}
 
 		virtual void begin() {
-			if ((row_index == position_in_data_cache) && (number_of_valid_rows_in_cache > 0)) {
+			if ((row_index == position_in_cache) && (number_of_rows_in_cache > 0)) {
 				// if the beginning is already in the cache, do nothing
 				row_index = 0;
-				position_in_data_cache = 0;
+				position_in_cache = 0;
 				// close the file because everything is in the cache
 				if (in.is_open()) {
 					in.close();
@@ -121,17 +143,19 @@ template <typename T> class LargeSparseMatrixVW : public LargeSparseMatrix<T> {
 				return;
 			}
 			row_index = 0;
-			position_in_data_cache = 0;
-			number_of_valid_rows_in_cache = 0;
-			number_of_valid_entries_in_cache = 0;
+			position_in_cache = 0;
+			number_of_rows_in_cache = 0;
+			number_of_entries_in_cache = 0;
 			in.seekg(sizeof(file_header), std::ios_base::beg);
 			readcache();
 		}
 
 		virtual bool end() { return row_index >= num_rows; }
 
-		virtual sparse_row<T>& getRow() { return data(position_in_data_cache); }
+		virtual sparse_row<T>& getRow() { return data(position_in_cache); }
 		virtual uint getRowIndex() { return row_index; }
 	
 	
 };
+
+#endif

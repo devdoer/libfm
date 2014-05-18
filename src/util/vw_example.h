@@ -2,42 +2,49 @@
 #define VW_EXAMPLE_H
 
 #include <string>
-#include "fmatrix.h"
-#include "parse_example.h" //from vw
+#include <vector>
+#include <float.h>
+#include "../util/fmatrix.h"
+#include "../fm_core/fm_data.h"
+#define MAX_ENTRY_PER_ROW 4096
+
+typedef sparse_entry<float> Feature;
 
 class VWExample{
 public:
-	DATA_FLOAT label;
+	float label;
 	int weight;
-	sparse_row<DATA_FLOAT> row;
+	float initial ;
+	std::string tag;
+	std::vector<unsigned char> indices;
+	std::vector<Feature> atomics[256]; 
+	std::vector<Feature > features;
 	
 public:
 	VWExample()
 	{
 		label = FLT_MAX;
-		weight = 1;
+		weight = 1.;
+		initial = 0.;
 		tag = "";
+		features.reserve(MAX_ENTRY_PER_ROW);
+		
 	}	
-};
-
-class VWExampleLoad{
-	
-public:
-	int hash(){
-		
-		
-	}
-	
-	int parse_line(const std::string &line){
-		//  label weight tag|namespace fea:val fea:val |namespace ...
-		//  label weight |
-		//  label tag|
-		//   label |
+	void clear(){
+		label = FLT_MAX;
+		weight = 1.;
+		initial = 0.;
+		tag = "";
+		for(int i = 0; i<indices.size();i++){
+			unsigned char index = indices[i];
+			atomics[index].clear();
+		}	
+		indices.clear();
+		features.clear();
 		
 	}
-
-
 };
+
 
 
 #endif	

@@ -133,39 +133,8 @@ uint32_t uniform_hash (const void * key, size_t len, uint32_t seed)
 }
 
 
-size_t hashstring (substring s, uint32_t h)
-{//h is a hash base
-  size_t ret = 0;
-  //trim leading whitespace but not UTF-8
-  for(; s.begin < s.end && *(s.begin) <= 0x20 && (int)*(s.begin) >= 0; s.begin++);
-  //trim trailing white space but not UTF-8
-  for(; s.end > s.begin && *(s.end-1) <= 0x20 && (int)*(s.end-1) >=0; s.end--);
 
-  char *p = s.begin;
-  while (p != s.end)
-    if (*p >= '0' && *p <= '9')
-      ret = 10*ret + *(p++) - '0';
-    else
-      return uniform_hash((unsigned char *)s.begin, s.end - s.begin, h);
 
-  return ret + h;
-}
-
-size_t hashall (substring s, uint32_t h)
-{
-  return uniform_hash((unsigned char *)s.begin, s.end - s.begin, h);
-}
-
-hash_func_t getHasher(const string& s){
-  if (s=="strings")
-    return hashstring;
-  else if(s=="all")
-    return hashall;
-  else{
-    cerr << "Unknown hash function: " << s << ". Exiting " << endl;
-    throw exception();
-  }
-}
 
 
 
